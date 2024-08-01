@@ -118,7 +118,7 @@ const loadPage = (url) => {
 }
 
 const setDOM = (root, routings) => {
-    const defaultPage = routings.DefaultPage;
+    const defaultPage = routings.defaultPage;
     dataStore.root = root;
     dataStore.routeBase = routings.base_dir;
     dataStore.routeList = routings.route;
