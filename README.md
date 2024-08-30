@@ -1,6 +1,8 @@
 # Render JS
 A library that handles JS routing, state DOM updating, and injecting JS into HTML.
 
+Live Demo: https://soniksarungale.com/renderJS/
+
 ## Basic Setup
 ```
 <div id="root"></div>
