@@ -3,15 +3,23 @@ const dataStore = {
     routeBase: null,
     root: null,
     data: {},
-    originalHTML: document.getElementById('root'),
+    originalHTML: null,
     currHTML: "",
+    baseUrl: "",
     appendedScripts: [],
+    renderList: [],
     setData: function(newData) {
         Object.assign(this.data, newData);
         this.updateParts();
     },
     get: function(varname){
         return this.data[varname];
+    },
+    storeRenderList: function(){
+        this.renderList = [];
+        this.root.querySelectorAll('[data-render]').forEach(element => {
+            this.renderList.push({"elm": element,"rawHTML":element.innerHTML});
+        });
     },
     removeAppendedTempScripts: function() {
         this.appendedScripts.forEach(script => script.remove());
@@ -50,10 +58,8 @@ const dataStore = {
         const ifPattern = /{{#if\s+\((.*?)\)}}([\s\S]*?){{\/if}}/g;
         const eachPattern = /{{#each\s+(\w+)\s*}}([\s\S]*?){{\/each}}/g;
 
-        let bufferHTML = this.originalHTML.innerHTML;
-        
-        this.originalHTML.querySelectorAll('[data-render]').forEach(element => {
-            let contentBox = element.innerHTML;
+        this.renderList.forEach(element => {
+            let contentBox = element.rawHTML;
             contentBox = contentBox.replace(eachPattern, (match, array, loopContent) => {
                 if (!Array.isArray(this.data[array])) {
                     return '';
@@ -73,17 +79,8 @@ const dataStore = {
             contentBox = contentBox.replace(variablePattern, (match, variable) => {
                 return this.data[variable] !== undefined ? this.data[variable] : '';
             });
-            
-            const targetHTMLRegex = new RegExp(
-                element.innerHTML
-                    .replace(/([.*+?^${}()|[\]\\])/g, '\\$1')
-                    .replace(/\s+/g, '\\s*'),
-                's'
-            );
-            bufferHTML = bufferHTML.replace(targetHTMLRegex, contentBox);
+            element.elm.innerHTML = contentBox;
         });
-        this.currHTML=bufferHTML;
-        this.renderHTML();
     },
     renderHTML: function() {
         if (this.root) {
@@ -93,7 +90,9 @@ const dataStore = {
     setRoutes: function() {
         const tempRoutesList = {};
         document.querySelectorAll('.async-link').forEach((elm) => {
-            tempRoutesList[elm.getAttribute('href')] = elm.getAttribute('page-target');
+            if(elm.hasAttribute('page-target')){
+                tempRoutesList[elm.getAttribute('href')] = elm.getAttribute('page-target');
+            }
         });
 
         this.routeList = {...this.routeList, ...Object.entries(tempRoutesList).map(([key, value]) => ({ [key]: value }))};
@@ -105,7 +104,7 @@ const renderPage = (page) => {
         .then(html => {
             dataStore.currHTML = html;
             dataStore.renderHTML(); 
-            dataStore.originalHTML = dataStore.root.cloneNode(true);
+            dataStore.storeRenderList();
             dataStore.executeScript();
             dataStore.setRoutes(); 
         })
@@ -113,16 +112,22 @@ const renderPage = (page) => {
 }
 
 const loadPage = (url) => {
-    window.history.pushState('', '', `/#${url}`);
-    return renderPage(dataStore.routeList[url]);
+    window.history.pushState('', '', `${dataStore.baseUrl}#${url}`);
+    let page = dataStore.routeList[url];
+    if (!dataStore.routeList.hasOwnProperty(url)) page = `${url}.html`;
+    return renderPage(page);
+}
+
+const getBaseUrl = () => {
+    return window.location.pathname;
 }
 
 const setDOM = (root, routings) => {
     const defaultPage = routings.defaultPage;
     dataStore.root = root;
     dataStore.routeBase = routings.base_dir;
-    dataStore.routeList = routings.route;
-
+    dataStore.routeList = routings.route || [];
+    dataStore.baseUrl = getBaseUrl();
     return loadPage(defaultPage).then(() => {
         dataStore.setRoutes();
     });
